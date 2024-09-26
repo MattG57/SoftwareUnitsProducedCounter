@@ -1,7 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Slider } from '@/components/ui/slider';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+// Use React and Recharts from global scope
+const { useState, useEffect, useCallback } = React;
+const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = Recharts;
+
+// Simple implementations of UI components
+const Slider = ({ value, onValueChange, min, max, step, disabled }) => (
+  <input 
+    type="range" 
+    value={value[0]} 
+    onChange={(e) => onValueChange([parseFloat(e.target.value)])} 
+    min={min} 
+    max={max} 
+    step={step}
+    disabled={disabled}
+    className="w-full"
+  />
+);
+
+const Card = ({ children, className }) => (
+  <div className={`border rounded p-4 ${className}`}>{children}</div>
+);
+
+const CardHeader = ({ children }) => <div className="mb-2">{children}</div>;
+const CardTitle = ({ children, className }) => <h3 className={`font-bold ${className}`}>{children}</h3>;
+const CardContent = ({ children }) => <div>{children}</div>;
 
 const ProductionSimulator = () => {
   const [totalHours, setTotalHours] = useState(1000);
@@ -192,4 +213,5 @@ const ProductionSimulator = () => {
   );
 };
 
-export default ProductionSimulator;
+// Assign to window object for global access
+window.ProductionSimulator = ProductionSimulator;

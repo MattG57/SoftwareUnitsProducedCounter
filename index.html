@@ -63,6 +63,13 @@ const ProductionSimulator = () => {
     setCopilotEffect(calculatedEffect);
   }, [copilotAdoption, copilotActivity]);
 
+  useEffect(() => {
+    const calculatedAdoption = copilotEffect / (copilotActivity * 0.5);
+    const calculatedActivity = copilotEffect / (copilotAdoption * 0.5);
+    setCopilotAdoption(calculatedAdoption);
+    setCopilotActivity(calculatedActivity);
+  }, [copilotEffect]);
+
   const ControlCard = ({ title, children }) => (
     <Card className="h-full">
       <CardHeader>
@@ -165,7 +172,6 @@ const ProductionSimulator = () => {
               min={0}
               max={0.5}
               step={0.01}
-              disabled
             />
             <p className="mt-4 mb-2 text-xs text-gray-600">Adoption %</p>
             <Slider

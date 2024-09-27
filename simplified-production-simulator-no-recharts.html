@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simplified Production Simulator</title>
+    <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useCallback } = React;
+
+        const Slider = ({ value, onValueChange, min, max, step, disabled }) => (
+            <input 
+                type="range" 
+                value={value} 
+                onChange={(e) => onValueChange(parseFloat(e.target.value))} 
+                min={min} 
+                max={max} 
+                step={step}
+                disabled={disabled}
+                className="w-full"
+            />
+        );
+
+        const Card = ({ children, className }) => (
+            <div className={`border rounded p-4 ${className}`}>{children}</div>
+        );
+
+        const CardHeader = ({ children }) => <div className="mb-2">{children}</div>;
+        const CardTitle = ({ children, className }) => <h3 className={`font-bold ${className}`}>{children}</h3>;
+        const CardContent = ({ children }) => <div>{children}</div>;
+
+        const SimpleChart = ({ data }) => {
+            const maxUnits = Math.max(...data.map(d => d.units));
+            return (
+                <div className="h-64 flex items-end">
+                    {data.map((d, i) => (
+                        <div 
+                            key={i} 
+                            className="bg-blue-500 w-1" 
+                            style={{height: `${(d.units / maxUnits) * 100}%`}}
+                            title={`Time: ${new Date(d.time).toLocaleTimeString()}, Units: ${d.units.toFixed(2)}`}
+                        />
+                    ))}
+                </div>
+            );
+        };
+
+        const ProductionSimulator = () => {
+            const [totalHours, setTotalHours] = useState(1000);
+            const [inefficientHours1, setInefficientHours1] = useState(100);
+            const [copilotEffect, setCopilotEffect] = useState(0);
+            const [copilotAdoption, setCopilotAdoption] = useState(0);
+            const [copilotActivity, setCopilotActivity] = useState(0);
+            const HOURS_PER_UNIT = 10;
+
+            const [unitsProduced, setUnitsProduced] = useState(0);
+            const [inefficientHours2, setInefficientHours2] = useState(0);
+            const [productionHistory, setProductionHistory] = useState([]);
+
+            const calculateProduction = useCallback(() => {
+                const copilotAdjustedHoursPerUnit = HOURS_PER_UNIT * (1 - (copilotEffect * 0.3));
+                
+                let calculatedUnits = 0;
+                let calculatedInefficientHours2 = 0;
+                let remainingHours = totalHours - inefficientHours1;
+
+                while (remainingHours > 0) {
+                    const newUnit = Math.min(1, remainingHours / copilotAdjustedHoursPerUnit);
+                    calculatedUnits += newUnit;
+                    const newInefficientHours = 2 * newUnit;
+                    calculatedInefficientHours2 += newInefficientHours;
+                    remainingHours -= (copilotAdjustedHoursPerUnit * newUnit + newInefficientHours);
+                }
+
+                return {
+                    units: Math.round(calculatedUnits * 100) / 100,
+                    inefficientHours2: Math.round(calculatedInefficientHours2 * 100) / 100
+                };
+            }, [totalHours, inefficientHours1, copilotEffect]);
+
+            useEffect(() => {
+                const { units, inefficientHours2 } = calculateProduction();
+                setUnitsProduced(units);
+                setInefficientHours2(inefficientHours2);
+            }, [calculateProduction]);
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    const currentTime = new Date();
+                    const { units } = calculateProduction();
+                    setProductionHistory(prevHistory => {
+                        const newHistory = [
+                            ...prevHistory,
+                            { time: currentTime.toISOString(), units }
+                        ].slice(-60); // Keep last 60 data points
+                        return newHistory;
+                    });
+                }, 1000); // Update every second
+
+                return () => clearInterval(interval);
+            }, [calculateProduction]);
+
+            useEffect(() => {
+                const calculatedEffect = copilotAdoption * copilotActivity * 0.5;
+                setCopilotEffect(calculatedEffect);
+            }, [copilotAdoption, copilotActivity]);
+
+            const ControlCard = ({ title, children }) => (
+                <Card className="h-full">
+                    <CardHeader>
+                        <CardTitle className="text-sm">{title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>{children}</CardContent>
+                </Card>
+            );
+
+            return (
+                <div className="p-6 bg-gray-100 rounded-lg">
+                    <h2 className="text-xl font-bold mb-4">
+                        Production Simulator: Units Produced = (Total Hours - Inefficient Hours (1) - Inefficient Hours (2)) / (Hours per Unit adjusted for Copilot-effect)
+                    </h2>
+                    
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                        <div className="col-span-1">
+                            <ControlCard title="Hours per Unit">
+                                <p className="mb-2 text-xs text-gray-600">Base hours required per unit.</p>
+                                <p className="text-sm">Constant: {HOURS_PER_UNIT} hours</p>
+                                <p className="text-sm">Adjusted: {(HOURS_PER_UNIT * (1 - (copilotEffect * 0.3))).toFixed(2)} hours</p>
+                            </ControlCard>
+                        </div>
+
+                        <div className="col-span-2">
+                            <Card className="h-full bg-blue-100">
+                                <CardHeader>
+                                    <CardTitle>Results</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-lg font-bold">Units Produced: {unitsProduced}</p>
+                                    <p>Inefficient Hours (2): {inefficientHours2.toFixed(1)} hours</p>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
+
+                    <Card className="mb-4">
+                        <CardHeader>
+                            <CardTitle>Production History (Last 1 Minute)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <SimpleChart data={productionHistory} />
+                        </CardContent>
+                    </Card>
+
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-1">
+                            <ControlCard title="Total Hours">
+                                <p className="mb-2 text-xs text-gray-600">Available hours for production.</p>
+                                <Slider
+                                    value={totalHours}
+                                    onValueChange={setTotalHours}
+                                    min={850}
+                                    max={1150}
+                                    step={1}
+                                />
+                                <p className="mt-2 text-sm">Value: {totalHours} hours</p>
+                            </ControlCard>
+                        </div>
+
+                        <div className="col-span-1">
+                            <ControlCard title="Inefficient Hours (1)">
+                                <p className="mb-2 text-xs text-gray-600">Hours lost due to inefficiencies.</p>
+                                <Slider
+                                    value={inefficientHours1}
+                                    onValueChange={setInefficientHours1}
+                                    min={90}
+                                    max={110}
+                                    step={0.1}
+                                />
+                                <p className="mt-2 text-sm">Value: {inefficientHours1.toFixed(1)} hours</p>
+                            </ControlCard>
+                        </div>
+
+                        <div className="col-span-1">
+                            <ControlCard title="Copilot Effect">
+                                <p className="mb-2 text-xs text-gray-600">Productivity gain from AI tools.</p>
+                                <p className="mb-2 text-sm">Copilot Effect: {(copilotEffect * 100).toFixed(1)}% reduction</p>
+                                <Slider
+                                    value={copilotEffect}
+                                    onValueChange={setCopilotEffect}
+                                    min={0}
+                                    max={0.5}
+                                    step={0.01}
+                                    disabled
+                                />
+                                <p className="mt-4 mb-2 text-xs text-gray-600">Adoption %</p>
+                                <Slider
+                                    value={copilotAdoption}
+                                    onValueChange={setCopilotAdoption}
+                                    min={0}
+                                    max={1}
+                                    step={0.01}
+                                />
+                                <p className="mt-2 text-sm">Adoption: {(copilotAdoption * 100).toFixed(1)}%</p>
+                                <p className="mt-4 mb-2 text-xs text-gray-600">Activity %</p>
+                                <Slider
+                                    value={copilotActivity}
+                                    onValueChange={setCopilotActivity}
+                                    min={0}
+                                    max={1}
+                                    step={0.01}
+                                />
+                                <p className="mt-2 text-sm">Activity: {(copilotActivity * 100).toFixed(1)}%</p>
+                            </ControlCard>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(
+            <ProductionSimulator />,
+            document.getElementById('root')
+        );
+    </script>
+</body>
+</html>

@@ -12,7 +12,213 @@
 </head>
 <body>
     <div id="root"></div>
-    <script type="text/babel" src="ProductionSimulator.js"></script>
-    <script type="text/babel" src="index.js"></script>
+    
+    <script type="text/babel">
+        // Production Simulator component code here
+        const ProductionSimulator = () => {
+            import React, { useState, useEffect, useCallback } from 'react';
+import { Slider } from '@/components/ui/slider';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+const ProductionSimulator = () => {
+  const [totalHours, setTotalHours] = useState(1000);
+  const [inefficientHours1, setInefficientHours1] = useState(100);
+  const [copilotEffect, setCopilotEffect] = useState(0);
+  const [copilotAdoption, setCopilotAdoption] = useState(0);
+  const [copilotActivity, setCopilotActivity] = useState(0);
+  const HOURS_PER_UNIT = 10;
+
+  const [unitsProduced, setUnitsProduced] = useState(0);
+  const [inefficientHours2, setInefficientHours2] = useState(0);
+  const [productionHistory, setProductionHistory] = useState([]);
+
+  const calculateProduction = useCallback(() => {
+    const copilotAdjustedHoursPerUnit = HOURS_PER_UNIT * (1 - (copilotEffect * 0.3));
+    
+    let calculatedUnits = 0;
+    let calculatedInefficientHours2 = 0;
+    let remainingHours = totalHours - inefficientHours1;
+
+    while (remainingHours > 0) {
+      const newUnit = Math.min(1, remainingHours / copilotAdjustedHoursPerUnit);
+      calculatedUnits += newUnit;
+      const newInefficientHours = 2 * newUnit;
+      calculatedInefficientHours2 += newInefficientHours;
+      remainingHours -= (copilotAdjustedHoursPerUnit * newUnit + newInefficientHours);
+    }
+
+    return {
+      units: Math.round(calculatedUnits * 100) / 100,
+      inefficientHours2: Math.round(calculatedInefficientHours2 * 100) / 100
+    };
+  }, [totalHours, inefficientHours1, copilotEffect]);
+
+  useEffect(() => {
+    const { units, inefficientHours2 } = calculateProduction();
+    setUnitsProduced(units);
+    setInefficientHours2(inefficientHours2);
+  }, [calculateProduction]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const currentTime = new Date();
+      const { units } = calculateProduction();
+      setProductionHistory(prevHistory => {
+        const newHistory = [
+          ...prevHistory,
+          { time: currentTime.toISOString(), units }
+        ].slice(-120); // Keep only last 120 data points (1 minute at 500ms intervals)
+        return newHistory;
+      });
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [calculateProduction]);
+
+  useEffect(() => {
+    const calculatedEffect = copilotAdoption * copilotActivity * 0.5;
+    setCopilotEffect(calculatedEffect);
+  }, [copilotAdoption, copilotActivity]);
+
+  const ControlCard = ({ title, children }) => (
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle className="text-sm">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="p-6 bg-gray-100 rounded-lg">
+      <h2 className="text-xl font-bold mb-4">
+        Production Simulator: Units Produced = (Total Hours - Inefficient Hours (1) - Inefficient Hours (2)) / (Hours per Unit adjusted for Copilot-effect)
+      </h2>
+      
+      <div className="grid grid-cols-3 gap-4 mb-4">
+        <div className="col-span-1">
+          <ControlCard title="Hours per Unit">
+            <p className="mb-2 text-xs text-gray-600">Base hours required per unit.</p>
+            <p className="text-sm">Constant: {HOURS_PER_UNIT} hours</p>
+            <p className="text-sm">Adjusted: {(HOURS_PER_UNIT * (1 - (copilotEffect * 0.3))).toFixed(2)} hours</p>
+          </ControlCard>
+        </div>
+
+        <div className="col-span-2">
+          <Card className="h-full bg-blue-100">
+            <CardHeader>
+              <CardTitle>Results</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-lg font-bold">Units Produced: {unitsProduced}</p>
+              <p>Inefficient Hours (2): {inefficientHours2.toFixed(1)} hours</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Production History (Last 1 Minute)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div style={{ width: '100%', height: 300 }}>
+            <ResponsiveContainer>
+              <LineChart data={productionHistory}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="time" 
+                  tickFormatter={(time) => new Date(time).toLocaleTimeString()} 
+                  interval={20}
+                />
+                <YAxis />
+                <Tooltip 
+                  labelFormatter={(label) => new Date(label).toLocaleTimeString()}
+                  formatter={(value) => [`${value.toFixed(2)} units`, "Production"]}
+                />
+                <Line type="monotone" dataKey="units" stroke="#8884d8" dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="col-span-1">
+          <ControlCard title="Total Hours">
+            <p className="mb-2 text-xs text-gray-600">Available hours for production.</p>
+            <Slider
+              value={[totalHours]}
+              onValueChange={(value) => setTotalHours(value[0])}
+              min={850}
+              max={1150}
+              step={1}
+            />
+            <p className="mt-2 text-sm">Value: {totalHours} hours</p>
+          </ControlCard>
+        </div>
+
+        <div className="col-span-1">
+          <ControlCard title="Inefficient Hours (1)">
+            <p className="mb-2 text-xs text-gray-600">Hours lost due to inefficiencies.</p>
+            <Slider
+              value={[inefficientHours1]}
+              onValueChange={(value) => setInefficientHours1(value[0])}
+              min={90}
+              max={110}
+              step={0.1}
+            />
+            <p className="mt-2 text-sm">Value: {inefficientHours1.toFixed(1)} hours</p>
+          </ControlCard>
+        </div>
+
+        <div className="col-span-1">
+          <ControlCard title="Copilot Effect">
+            <p className="mb-2 text-xs text-gray-600">Productivity gain from AI tools.</p>
+            <p className="mb-2 text-sm">Copilot Effect: {(copilotEffect * 100).toFixed(1)}% reduction</p>
+            <Slider
+              value={[copilotEffect]}
+              onValueChange={(value) => setCopilotEffect(value[0])}
+              min={0}
+              max={0.5}
+              step={0.01}
+              disabled
+            />
+            <p className="mt-4 mb-2 text-xs text-gray-600">Adoption %</p>
+            <Slider
+              value={[copilotAdoption]}
+              onValueChange={(value) => setCopilotAdoption(value[0])}
+              min={0}
+              max={1}
+              step={0.01}
+            />
+            <p className="mt-2 text-sm">Adoption: {(copilotAdoption * 100).toFixed(1)}%</p>
+            <p className="mt-4 mb-2 text-xs text-gray-600">Activity %</p>
+            <Slider
+              value={[copilotActivity]}
+              onValueChange={(value) => setCopilotActivity(value[0])}
+              min={0}
+              max={1}
+              step={0.01}
+            />
+            <p className="mt-2 text-sm">Activity: {(copilotActivity * 100).toFixed(1)}%</p>
+          </ControlCard>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ProductionSimulator;
+        };
+
+        ReactDOM.render(
+            <React.StrictMode>
+                <ProductionSimulator />
+            </React.StrictMode>,
+            document.getElementById('root')
+        );
+    </script>
 </body>
 </html>
